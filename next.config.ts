@@ -9,9 +9,6 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-} as any;
+};
 
 export default nextConfig;
