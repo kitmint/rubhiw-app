@@ -9,6 +9,15 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: process.env.NEXT_PUBLIC_SUPABASE_IMAGE_HOST || '', 
+      },
+    ],
+  },
+
 };
 
 export default nextConfig;

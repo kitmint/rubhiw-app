@@ -20,7 +20,7 @@ interface Order {
   contact: string | null;
   total_price: number;
   shipping_fee: number;
-  status: "pending" | "preparing" | "shipped" | "cancelled";
+  status: "pending" | "buying" | "waiting_pack" | "shipped" | "out_of_stock" | "refunded" | "cancelled";
   slip_url: string | null;
   address: string | null;
   tracking_number: string | null;
@@ -86,7 +86,7 @@ export default function AdminTodoListPage() {
         .order("created_at", { ascending: false });
 
       if (ordersError) throw ordersError;
-      setOrders(ordersData as any[] || []);
+      setOrders((ordersData as unknown as Order[]) || []);
 
       // ดึงรายชื่อสินค้า
       const { data: prodsData, error: prodsError } = await supabase
@@ -103,15 +103,23 @@ export default function AdminTodoListPage() {
           setNewSelectedSize(prodsData[0].size.split(",")[0].trim());
         }
       }
-    } catch (err: any) {
-      alert(`ดึงข้อมูลล้มเหลว: ${err.message}`);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        alert(`ดึงข้อมูลล้มเหลว: ${err.message}`);
+      } else {
+        alert("ดึงข้อมูลล้มเหลว: เกิดข้อผิดพลาดที่ไม่รู้จัก");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    const initFetch = async () => {
+      await fetchData();
+    };
+    
+    initFetch();
   }, []);
 
   const handleManualRefresh = () => {
@@ -151,8 +159,12 @@ export default function AdminTodoListPage() {
       ));
       
       setEditingOrderId(null);
-    } catch (err: any) {
-      alert(`ไม่สามารถอัปเดตข้อมูลได้: ${err.message}`);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        alert(`ไม่สามารถอัปเดตข้อมูลได้: ${err.message}`);
+      } else {
+        alert("ไม่สามารถอัปเดตข้อมูลได้: เกิดข้อผิดพลาดที่ไม่รู้จัก");
+      }
     } finally {
       setActionLoading(false);
     }
@@ -246,7 +258,7 @@ export default function AdminTodoListPage() {
           `);
 
         if (insertError) throw insertError;
-        finalSavedItems = insertedData as any[] || [];
+        finalSavedItems = insertedData as unknown as OrderItem[] || [];
       }
 
       const newItemsTotal = tempOrderItems.reduce((sum, item) => {
@@ -269,94 +281,114 @@ export default function AdminTodoListPage() {
 
       setItemEditingOrder(null);
       alert("🎉 บันทึกการจัดการเพิ่ม/ลดรายการสินค้า และอัปเดตยอดเงินรวมเรียบร้อยแล้วค่ะ");
-    } catch (err: any) {
-      alert(`จัดการรายการสินค้าขัดข้อง: ${err.message}`);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        alert(`จัดการรายการสินค้าขัดข้อง: ${err.message}`);
+      } else {
+        alert("จัดการรายการสินค้าขัดข้อง: เกิดข้อผิดพลาดที่ไม่รู้จัก");
+      }
     } finally {
       setActionLoading(false);
     }
   };
 
   const getStatusBadge = (status: string) => {
-  const styles: { [key: string]: string } = {
-    pending: "bg-amber-100 text-amber-800 border-amber-200",
-    buying: "bg-sky-100 text-sky-800 border-sky-200",
-    waiting_pack: "bg-indigo-100 text-indigo-800 border-indigo-200",
-    shipped: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    out_of_stock: "bg-rose-100 text-rose-800 border-rose-200",
-    refunded: "bg-slate-100 text-slate-700 border-slate-300 bg-opacity-50",
-    cancelled: "bg-gray-100 text-gray-800 border-gray-200",
+    const styles: { [key: string]: string } = {
+      pending: "bg-amber-100 text-amber-800 border-amber-200",
+      buying: "bg-sky-100 text-sky-800 border-sky-200",
+      waiting_pack: "bg-indigo-100 text-indigo-800 border-indigo-200",
+      shipped: "bg-emerald-100 text-emerald-800 border-emerald-200",
+      out_of_stock: "bg-rose-100 text-rose-800 border-rose-200",
+      refunded: "bg-slate-100 text-slate-700 border-slate-300 bg-opacity-50",
+      cancelled: "bg-gray-100 text-gray-800 border-gray-200",
+    };
+
+    const labels: { [key: string]: string } = {
+      pending: "⏳ รอตรวจสอบ",
+      buying: "🛍️ กำลังหิ้ว",
+      waiting_pack: "📦 หิ้วได้ (รอแพ็ค)",
+      shipped: "🚚 จัดส่งแล้ว",
+      out_of_stock: "❌ ของหมด (รอคืนเงิน)",
+      refunded: "💰 คืนเงินเรียบร้อย",
+      cancelled: "🚫 ยกเลิกออเดอร์",
+    };
+
+    const currentStyle = styles[status] || "bg-slate-100 text-slate-800 border-slate-200";
+    const currentLabel = labels[status] || status;
+
+    return (
+      <span 
+        className={`
+          inline-flex items-center gap-1 
+          whitespace-nowrap rounded-full border font-bold
+          /* 📱 บนจอมือถือเล็ก: ลดขนาดฟอนต์และ padding ลง */
+          text-[10px] px-2 py-0.5
+          /* 💻 บนจอคอม/แท็บเล็ต (sm ขึ้นไป): ปรับกลับเป็นขนาดเดิมของคุณ */
+          sm:text-xs sm:px-2.5 sm:py-1 
+          ${currentStyle}
+        `}
+      >
+        {currentLabel}
+      </span>
+    );
   };
-
-  const labels: { [key: string]: string } = {
-    pending: "⏳ รอโอนเงิน/รอตรวจสอบ",
-    buying: "🛍️ กำลังหิ้ว",
-    waiting_pack: "📦 หิ้วได้ (รอแพ็ค)",
-    shipped: "🚚 จัดส่งแล้ว",
-    out_of_stock: "❌ ของหมด (รอคืนเงิน)",
-    refunded: "💰 คืนเงินเรียบร้อย",
-    cancelled: "🚫 ยกเลิกออเดอร์",
-  };
-
-  const currentStyle = styles[status] || "bg-slate-100 text-slate-800 border-slate-200";
-  const currentLabel = labels[status] || status;
-
-  return (
-    <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${currentStyle}`}>
-      {currentLabel}
-    </span>
-  );
-};
 
   if (loading) {
-    return <div className="p-8 text-center text-gray-500 font-medium">⌛ กำลังโหลดรายการออเดอร์หิ้วสักครู่นะคะ...</div>;
+    return <div className="p-8 text-center text-gray-500 font-medium text-sm sm:text-base">⌛ กำลังโหลดรายการออเดอร์หิ้วสักครู่นะคะ...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 text-black">
+    <div className="min-h-screen bg-slate-50 p-3 sm:p-4 md:p-8 text-black">
       <div className="max-w-6xl mx-auto">
         
-        <div className="flex justify-between items-center mb-6">
+        {/* หัวข้อเว็บ: บนมือถือจัดปุ่มรีเฟรชลงมาด้านล่าง หรือดันชิดขอบให้ไม่บังกัน */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">📋 บิลฝากหิ้วทั้งหมด (Admin TodoList)</h1>
-            <p className="text-sm text-gray-500">จัดการเปลี่ยนสถานะ แปะข้อมูลจัดส่ง และเพิ่ม/ลดของในบิลลูกค้า</p>
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">📋 บิลฝากหิ้วทั้งหมด (Admin TodoList)</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">จัดการเปลี่ยนสถานะ แปะข้อมูลจัดส่ง และเพิ่ม/ลดของในบิลลูกค้า</p>
           </div>
           <button 
             onClick={handleManualRefresh}
-            className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-sm font-semibold shadow-sm transition"
+            className="w-full sm:w-auto px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition text-center"
           >
             🔄 รีเฟรชข้อมูล
           </button>
         </div>
 
         {orders.length === 0 ? (
-          <div className="bg-white border border-gray-100 rounded-3xl p-12 text-center text-gray-400 font-medium shadow-sm">
+          <div className="bg-white border border-gray-100 rounded-3xl p-8 sm:p-12 text-center text-gray-400 font-medium shadow-sm text-xs sm:text-sm">
             📭 ยังไม่มีออเดอร์ฝากหิ้วเข้ามาในระบบเลยค่ะ
           </div>
         ) : (
           <div className="space-y-4">
             {orders.map((order) => (
-              <div key={order.id} className="bg-white border border-gray-100 shadow-md rounded-2xl p-5 hover:shadow-lg transition">
+              <div key={order.id} className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 sm:p-5 hover:shadow-md transition">
                 
-                <div className="flex flex-wrap justify-between items-start gap-2 border-b border-gray-100 pb-3 mb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs bg-gray-100 font-bold px-2 py-0.5 rounded text-gray-500">บิล #{order.id}</span>
-                      <h3 className="font-bold text-gray-900 text-base">👤 คุณ{order.customer_name}</h3>
+                {/* ส่วนหัวการ์ดออเดอร์: แยกกลุ่มบนมือถือไม่ให้กระดอนล้น */}
+                <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 border-b border-gray-100 pb-3 mb-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] bg-gray-100 font-bold px-1.5 py-0.5 rounded text-gray-500 whitespace-nowrap">บิล #{order.id}</span>
+                      <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">👤 คุณ{order.customer_name}</h3>
                     </div>
-                    <p className="text-xs text-gray-400 font-medium mt-1">📱 ติดต่อ: {order.contact || "➖"} | วันที่สั่ง: {new Date(order.created_at).toLocaleDateString('th-TH')}</p>
+                    <p className="text-[11px] text-gray-400 font-medium mt-1">
+                      📱 ติดต่อ: {order.contact || "➖"} <span className="mx-1">|</span> วันที่สั่ง: {new Date(order.created_at).toLocaleDateString('th-TH')}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(order.status)}
-                    <div className="flex gap-1">
+                  
+                  {/* ปุ่มจัดการบิล: บนมือถือปรับเป็นปุ่มคู่แบบ Grid 2 คอลัมน์ ไม่ให้ดันข้อมูลตกขอบ */}
+                  <div className="flex flex-row items-center justify-between lg:justify-end gap-2 w-full lg:w-auto pt-2 lg:pt-0 border-t lg:border-t-0 border-gray-50">
+                    <div className="flex-shrink-0">{getStatusBadge(order.status)}</div>
+                    <div className="grid grid-cols-2 gap-1.5 flex-1 lg:flex lg:flex-row lg:gap-1 max-w-[280px] lg:max-w-none ml-auto">
                       <button
                         onClick={() => openItemEditModal(order)}
-                        className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-xs font-bold transition border border-amber-200/40"
+                        className="w-full lg:w-auto px-2 sm:px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-[10px] sm:text-xs font-bold transition border border-amber-200/40 text-center whitespace-nowrap"
                       >
-                        📦 จัดการสินค้าในบิล
+                        📦 จัดการสินค้า
                       </button>
                       <button
                         onClick={() => openEditModal(order)}
-                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-bold transition"
+                        className="w-full lg:w-auto px-2 sm:px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] sm:text-xs font-bold transition border border-indigo-100/40 text-center whitespace-nowrap"
                       >
                         ✏️ แก้ไขบิล
                       </button>
@@ -364,35 +396,37 @@ export default function AdminTodoListPage() {
                   </div>
                 </div>
 
+                {/* รายการสินค้าฝากหิ้วภายในบิล */}
                 <div className="mb-4">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">🛍️ รายการสินค้าฝากหิ้ว</p>
-                  <ul className="space-y-1 bg-gray-50 rounded-xl p-3 text-sm font-medium">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">🛍️ รายการสินค้าฝากหิ้ว</p>
+                  <ul className="space-y-1.5 bg-gray-50 rounded-xl p-3 text-xs sm:text-sm font-medium">
                     {order.order_items.length === 0 ? (
-                      <li className="text-gray-400 text-xs text-center py-1">🚫 ไม่มีรายการสินค้าในบิลนี้ (กดปุ่มสีส้มเพื่อเพิ่มสินค้า)</li>
+                      <li className="text-gray-400 text-[11px] text-center py-1">🚫 ไม่มีรายการสินค้าในบิลนี้ (กดปุ่มจัดการสินค้าเพื่อเพิ่ม)</li>
                     ) : (
                       order.order_items.map((item) => (
-                        <li key={item.id} className="flex justify-between text-gray-700">
-                          <span>• {item.products?.name} {item.selected_size !== "N/A" && `(ไซส์: ${item.selected_size})`}</span>
-                          <span className="text-gray-900 font-bold">x {item.quantity}</span>
+                        <li key={item.id} className="flex justify-between items-start text-gray-700 gap-4">
+                          <span className="break-words min-w-0">• {item.products?.name} {item.selected_size !== "N/A" && `(ไซส์: ${item.selected_size})`}</span>
+                          <span className="text-gray-900 font-bold whitespace-nowrap flex-shrink-0">x {item.quantity}</span>
                         </li>
                       ))
                     )}
                   </ul>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-medium border-t border-gray-50 pt-3 text-gray-600">
-                  <div>
-                    <span className="text-gray-400 block">💰 ยอดรวมจัดสุทธิ:</span>
-                    <span className="text-sm font-black text-gray-900">฿{(order.total_price).toLocaleString()}</span> 
-                    <span className="text-gray-400 text-[10px] ml-1">(รวมค่าส่ง ฿{order.shipping_fee})</span>
+                {/* แผงข้อมูลสรุปท้ายบิล: ปรับจาก 3 คอลัมน์คอม เป็น 1 คอลัมน์บนมือถือ เพื่อเพิ่มพื้นที่หายใจ */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] sm:text-xs font-medium border-t border-gray-50 pt-3 text-gray-600">
+                  <div className="bg-slate-50/50 p-2 rounded-lg sm:bg-transparent sm:p-0">
+                    <span className="text-gray-400 block mb-0.5">💰 ยอดรวมจัดสุทธิ:</span>
+                    <span className="text-xs sm:text-sm font-black text-gray-900">฿{(order.total_price).toLocaleString()}</span> 
+                    <span className="text-gray-400 text-[9px] sm:text-[10px] ml-1 block sm:inline">(รวมค่าส่ง ฿{order.shipping_fee})</span>
                   </div>
-                  <div>
-                    <span className="text-gray-400 block">📍 ที่อยู่จัดส่งลูกค้า:</span>
-                    <span className="text-gray-900 line-clamp-1">{order.address || "❌ ยังไม่มีที่อยู่ (รอแก้ไขเพิ่มเติม)"}</span>
+                  <div className="bg-slate-50/50 p-2 rounded-lg sm:bg-transparent sm:p-0">
+                    <span className="text-gray-400 block mb-0.5">📍 ที่อยู่จัดส่งลูกค้า:</span>
+                    <span className="text-gray-900 block line-clamp-2 sm:line-clamp-1">{order.address || "❌ ยังไม่มีที่อยู่ (รอแก้ไขเพิ่ม)"}</span>
                   </div>
-                  <div>
-                    <span className="text-gray-400 block">📦 เลข Tracking พัสดุ:</span>
-                    <span className="text-gray-900 font-mono tracking-wider font-bold">{order.tracking_number || "➖ ยังไม่มีเลขพัสดุ"}</span>
+                  <div className="bg-slate-50/50 p-2 rounded-lg sm:bg-transparent sm:p-0">
+                    <span className="text-gray-400 block mb-0.5">📦 เลข Tracking พัสดุ:</span>
+                    <span className="text-gray-900 font-mono tracking-wider font-bold block truncate">{order.tracking_number || "➖ ยังไม่มีเลขพัสดุ"}</span>
                   </div>
                 </div>
 
@@ -405,18 +439,18 @@ export default function AdminTodoListPage() {
 
       {/* 🛑 MODAL ที่ 1: หน้าต่างแก้ไขข้อมูลบิลทั่วไป */}
       {editingOrderId !== null && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
-            <h2 className="text-lg font-black text-gray-900 mb-4">✏️ แก้ไขข้อมูลออเดอร์หิ้ว บิล #{editingOrderId}</h2>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-base sm:text-lg font-black text-gray-900 mb-4">✏️ แก้ไขข้อมูลออเดอร์ บิล #{editingOrderId}</h2>
             <form onSubmit={handleUpdateOrder} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">📌 ปรับปรุงสถานะบิล</label>
+                <label className="block text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">📌 ปรับปรุงสถานะบิล</label>
                 <select
                   value={editStatus}
-                  onChange={(e: any) => setEditStatus(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none font-medium"
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditStatus(e.target.value as Order["status"])}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none font-medium text-black"
                 >
-                  <option value="pending">⏳ รอโอนเงิน/รอตรวจสอบ</option>
+                  <option value="pending">⏳ รอตรวจสอบ</option>
                   <option value="buying">🛍️ กำลังหิ้ว</option>
                   <option value="waiting_pack">📦 หิ้วได้ (รอแพ็ค)</option>
                   <option value="shipped">🚚 จัดส่งแล้ว</option>
@@ -426,26 +460,26 @@ export default function AdminTodoListPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">📍 ที่อยู่ปลายทางลูกค้า</label>
+                <label className="block text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">📍 ที่อยู่ปลายทางลูกค้า</label>
                 <textarea
                   rows={3}
                   value={editAddress}
-                  onChange={(e) => setEditAddress(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none font-medium resize-none"
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditAddress(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none font-medium resize-none text-black"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">📦 เลขพัสดุ Tracking Number</label>
+                <label className="block text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">📦 เลขพัสดุ Tracking Number</label>
                 <input
                   type="text"
                   value={editTracking}
-                  onChange={(e) => setEditTracking(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none font-mono font-bold tracking-wider"
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditTracking(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs sm:text-sm outline-none font-mono font-bold tracking-wider text-black"
                 />
               </div>
-              <div className="flex gap-2 pt-2 text-sm">
+              <div className="flex gap-2 pt-2 text-xs sm:text-sm">
                 <button type="button" onClick={() => setEditingOrderId(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-600 font-bold rounded-xl">ยกเลิก</button>
-                <button type="submit" disabled={actionLoading} className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-md disabled:opacity-50">
+                <button type="submit" disabled={actionLoading} className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-sm disabled:opacity-50">
                   {actionLoading ? "⌛ บันทึก..." : "💾 บันทึกข้อมูล"}
                 </button>
               </div>
@@ -454,19 +488,19 @@ export default function AdminTodoListPage() {
         </div>
       )}
 
-      {/* 🌟 🛑 MODAL ที่ 2: ศูนย์จัดการสินค้าในบิล (ยัดของเพิ่มชิ้นใหม่ / เพิ่มลดชิ้นเดิม / กดลบรายการออกเมื่อเหลือ 0) */}
+      {/* 🌟 🛑 MODAL ที่ 2: ศูนย์จัดการสินค้าในบิล */}
       {itemEditingOrder !== null && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 text-black">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <h2 className="text-lg font-black text-gray-900 mb-1">🛍️ ศูนย์จัดการสินค้าในบิล #{itemEditingOrder.id}</h2>
-            <p className="text-xs text-gray-400 mb-4">บิลของ คุณ{itemEditingOrder.customer_name} สามารถเพิ่มของใหม่ หรือปรับลดชิ้นเดิมได้เลยค่ะ</p>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 z-50 text-black">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl max-h-[95vh] overflow-y-auto">
+            <h2 className="text-base sm:text-lg font-black text-gray-900 mb-1">🛍️ ศูนย์จัดการสินค้าในบิล #{itemEditingOrder.id}</h2>
+            <p className="text-[11px] text-gray-400 mb-4">บิลของ คุณ{itemEditingOrder.customer_name} เพิ่มของใหม่ หรือปรับลดชิ้นเดิมได้เลยค่ะ</p>
             
-            {/* 📥 ส่วนเติมสินค้าชิ้นใหม่เข้าไปในบิลตรงๆ */}
-            <div className="bg-indigo-50/60 p-3.5 rounded-2xl border border-indigo-100/70 space-y-3 mb-4">
-              <p className="text-xs font-black text-indigo-950">➕ เพิ่มสินค้าชิ้นใหม่เข้าบิลนี้</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {/* กล่องเพิ่มสินค้าชิ้นใหม่บนมือถือสลับเป็น 1 คอลัมน์อัตโนมัติ */}
+            <div className="bg-indigo-50/60 p-3 rounded-2xl border border-indigo-100/70 space-y-3 mb-4">
+              <p className="text-[11px] font-black text-indigo-950">➕ เพิ่มสินค้าชิ้นใหม่เข้าบิลนี้</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 mb-0.5">เลือกสินค้า</label>
+                  <label className="block text-[9px] sm:text-[10px] font-bold text-gray-400 mb-0.5">เลือกสินค้า</label>
                   <select 
                     value={newSelectedProdId} 
                     onChange={(e) => handleNewProductChange(e.target.value)}
@@ -478,7 +512,7 @@ export default function AdminTodoListPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 mb-0.5">ไซส์</label>
+                  <label className="block text-[9px] sm:text-[10px] font-bold text-gray-400 mb-0.5">ไซส์</label>
                   <select 
                     value={newSelectedSize} 
                     onChange={(e) => setNewSelectedSize(e.target.value)}
@@ -494,9 +528,9 @@ export default function AdminTodoListPage() {
                   </select>
                 </div>
               </div>
-              <div className="flex gap-2 items-center pt-1">
-                <div className="flex items-center gap-1.5 w-1/3">
-                  <span className="text-xs font-medium text-gray-500">จำนวน:</span>
+              <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center pt-1">
+                <div className="flex items-center gap-1.5 w-full sm:w-1/3">
+                  <span className="text-xs font-medium text-gray-500 whitespace-nowrap">จำนวน:</span>
                   <input 
                     type="number" 
                     min="1" 
@@ -508,40 +542,40 @@ export default function AdminTodoListPage() {
                 <button 
                   type="button" 
                   onClick={handleAddNewItemToTemp} 
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 rounded-lg text-xs shadow-sm transition"
+                  className="w-full sm:flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 rounded-lg text-xs shadow-xs transition text-center"
                 >
                   🚀 ยัดสินค้าชิ้นนี้เพิ่มเข้าบิล
                 </button>
               </div>
             </div>
 
-            {/* ส่วนแสดงรายการสินค้าปัจจุบันที่มีอยู่ในใบฝากหิ้ว */}
-            <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">🛍️ รายการสินค้าในบิลชั่วคราว</p>
-            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+            {/* รายการสินค้าชั่วคราวใน Modal */}
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">🛍️ รายการสินค้าในบิลชั่วคราว</p>
+            <div className="space-y-2 max-h-44 sm:max-h-52 overflow-y-auto pr-1">
               {tempOrderItems.length === 0 ? (
-                <p className="text-xs text-center text-gray-400 py-8 font-medium">⚠️ ไม่มีรายการสินค้าในบิล (บิลจะว่างเปล่าเมื่อบันทึก)</p>
+                <p className="text-xs text-center text-gray-400 py-6 font-medium">⚠️ ไม่มีรายการสินค้าในบิล (บิลจะว่างเปล่าเมื่อบันทึก)</p>
               ) : (
                 tempOrderItems.map((item) => (
-                  <div key={item.id} className="flex justify-between items-center bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-                    <div className="flex-1 min-w-0 pr-2">
+                  <div key={item.id} className="flex justify-between items-center bg-gray-50 p-2 sm:p-2.5 rounded-xl border border-gray-100 gap-2">
+                    <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-gray-800 truncate">{item.products?.name}</p>
-                      <p className="text-[10px] text-gray-400 font-bold">ไซส์: {item.selected_size} | ฿{item.products?.price.toLocaleString()}/ชิ้น</p>
+                      <p className="text-[10px] text-gray-400 font-bold">ไซส์: {item.selected_size} | ฿{item.products?.price.toLocaleString()}</p>
                     </div>
                     
-                    {/* ปุ่ม เพิ่ม/ลด จำนวนสินค้า */}
-                    <div className="flex items-center gap-2">
+                    {/* ปุ่มเพิ่ม/ลดไอเทมใน Modal */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
                       <button 
                         type="button" 
                         onClick={() => handleQtyChange(item.id, -1)} 
-                        className="w-7 h-7 bg-white hover:bg-red-50 text-gray-600 hover:text-red-500 border border-gray-200 font-black text-xs rounded-lg flex items-center justify-center shadow-sm active:scale-95 transition"
+                        className="w-6 h-6 bg-white hover:bg-red-50 text-gray-600 hover:text-red-500 border border-gray-200 font-black text-xs rounded-lg flex items-center justify-center active:scale-95 transition"
                       >
                         -
                       </button>
-                      <span className="w-5 text-center text-xs font-black text-gray-900">{item.quantity}</span>
+                      <span className="w-4 text-center text-xs font-black text-gray-900">{item.quantity}</span>
                       <button 
                         type="button" 
                         onClick={() => handleQtyChange(item.id, 1)} 
-                        className="w-7 h-7 bg-white hover:bg-green-50 text-gray-600 hover:text-green-500 border border-gray-200 font-black text-xs rounded-lg flex items-center justify-center shadow-sm active:scale-95 transition"
+                        className="w-6 h-6 bg-white hover:bg-green-50 text-gray-600 hover:text-green-500 border border-gray-200 font-black text-xs rounded-lg flex items-center justify-center active:scale-95 transition"
                       >
                         +
                       </button>
@@ -551,8 +585,8 @@ export default function AdminTodoListPage() {
               )}
             </div>
 
-            {/* ปุ่มปิด หรือ ปุ่มยืนยันเซฟบันทึกบิลฉบับแก้ไข */}
-            <div className="flex gap-2 pt-2 border-t border-gray-100 text-sm mt-4">
+            {/* ปุ่มกดบันทึกของ Modal ยึดโครงล่างสวยๆ */}
+            <div className="flex gap-2 pt-2 border-t border-gray-100 text-xs sm:text-sm mt-4">
               <button 
                 type="button" 
                 onClick={() => setItemEditingOrder(null)} 
@@ -564,9 +598,9 @@ export default function AdminTodoListPage() {
                 type="button" 
                 disabled={actionLoading} 
                 onClick={handleSaveItemsUpdate} 
-                className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50"
+                className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold rounded-xl shadow-xs transition disabled:opacity-50"
               >
-                {actionLoading ? "⏳ กำลังเซฟข้อมูล..." : "💾 บันทึกยอดบิลฉบับใหม่"}
+                {actionLoading ? "⏳ กำลังเซฟ..." : "💾 บันทึกยอดบิลใหม่"}
               </button>
             </div>
 

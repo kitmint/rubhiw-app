@@ -36,6 +36,16 @@ export default function AdminAddOrdersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const updateSizeOptions = (productId: string, allProducts: Product[]) => {
+    const prod = allProducts.find((p) => p.id.toString() === productId);
+    if (prod && prod.size && prod.size.trim() !== "") {
+      const sizeArray = prod.size.split(",").map((s: string) => s.trim());
+      setSelectedSize(sizeArray[0] || "Free size");
+    } else {
+      setSelectedSize("Free size");
+    }
+  };
+  
   // ดึงข้อมูลสินค้า
   useEffect(() => {
     const fetchProducts = async () => {
@@ -61,15 +71,7 @@ export default function AdminAddOrdersPage() {
     fetchProducts();
   }, []);
 
-  const updateSizeOptions = (productId: string, allProducts: Product[]) => {
-    const prod = allProducts.find((p) => p.id.toString() === productId);
-    if (prod && prod.size && prod.size.trim() !== "") {
-      const sizeArray = prod.size.split(",").map((s: string) => s.trim());
-      setSelectedSize(sizeArray[0] || "Free size");
-    } else {
-      setSelectedSize("Free size");
-    }
-  };
+
 
   const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const targetId = e.target.value;

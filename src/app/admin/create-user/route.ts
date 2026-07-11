@@ -1,10 +1,28 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+interface CartItemInput {
+  product: {
+    id: string;
+  };
+  quantity: number;
+  selectedSize: string;
+}
+
+interface CreateOrderRequestBody {
+  phoneContact: string;
+  customerName?: string;
+  shippingFee: number;
+  totalPrice: number;
+  slipUrl: string;
+  cart: CartItemInput[];
+}
+
 export async function POST(request: Request) {
   try {
-    const { phoneContact, customerName, shippingFee, totalPrice, slipUrl, cart } = await request.json();
-    
+    const body = (await request.json()) as CreateOrderRequestBody;
+    const { phoneContact, customerName, shippingFee, totalPrice, slipUrl, cart } = body;
+
     const adminClient = getSupabaseAdmin();
     if (!adminClient) {
       return NextResponse.json({ error: 'สิทธิ์แอดมินหลังบ้านขัดข้อง คีย์ลับสูญหาย' }, { status: 500 });
@@ -104,7 +122,7 @@ export async function POST(request: Request) {
     if (orderError) return NextResponse.json({ error: `บันทึกออเดอร์ล้มเหลว: ${orderError.message}` }, { status: 500 });
 
     // 📦 3. บันทึกรายการสินค้าลง order_items
-    const itemsToInsert = cart.map((item: any) => ({
+    const itemsToInsert = cart.map((item: CartItemInput) => ({
       order_id: orderData.id,
       product_id: item.product.id,
       quantity: item.quantity,
@@ -118,7 +136,8 @@ export async function POST(request: Request) {
     if (itemsError) return NextResponse.json({ error: `บันทึกรายการสินค้าล้มเหลว: ${itemsError.message}` }, { status: 500 });
 
     return NextResponse.json({ success: true, orderId: orderData.id });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) { // 4. เปลี่ยนเป็น unknown ตามกฎความปลอดภัย
+    const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาดที่ไม่รู้จัก";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
