@@ -10,6 +10,7 @@ interface Product {
   price: number;
   hiew_fee: number;
   concert_name: string;
+  artist_band: string;
 }
 
 interface CartItem {
@@ -52,7 +53,7 @@ export default function AdminAddOrdersPage() {
       try {
         const { data, error } = await supabase
           .from("products")
-          .select("id, name, size, price, hiew_fee, concert_name")
+          .select("id, name, size, price, hiew_fee, concert_name, artist_band")
           .eq("is_active", true);
           
         if (error) throw error;
@@ -249,7 +250,7 @@ export default function AdminAddOrdersPage() {
                   >
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} (งาน: {p.concert_name || "ทั่วไป"}) — ฿{Number(p.price) + Number(p.hiew_fee)}
+                        {p.artist_band} / {p.name} (size: {p.size}) — ฿{Number(p.price) + Number(p.hiew_fee)}
                       </option>
                     ))}
                   </select>

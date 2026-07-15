@@ -36,8 +36,8 @@ export default function AdminProductsPage() {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .order('created_at', { ascending: false });
-      
+      .order('name', { ascending: true })
+      .order('price', { ascending: true });
 
     if (error) {
       setMessage(`❌ ไม่สามารถดึงข้อมูลได้: ${error.message}`);
@@ -97,7 +97,7 @@ export default function AdminProductsPage() {
         .from('products')
         .update({
           name: editingProduct.name,
-          size: editingProduct.size,
+          size: editingProduct.size.trim(),
           price: Number(editingProduct.price),
           hiew_fee: Number(editingProduct.hiew_fee),
           image_url: finalImageUrl,
@@ -331,13 +331,13 @@ export default function AdminProductsPage() {
               </div>
 
               <div>
-                <label className="block mb-1">ไซส์สินค้า (คั่นด้วยคอมมา) *</label>
-                <input type="text" required value={editingProduct.size} onChange={(e) => setEditingProduct({...editingProduct, size: e.target.value})} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm font-medium text-black outline-none focus:border-indigo-500" />
+                <label className="block mb-1 text-indigo-600">📐 ขนาดไซส์ของรายการนี้ (แก้ไขไม่ได้)</label>
+                <input type="text" disabled value={editingProduct.size} className="w-full p-2 bg-slate-100 border border-gray-200 rounded-xl text-xs sm:text-sm font-bold text-gray-500 outline-none cursor-not-allowed" />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block mb-1">ราคาป้าย *</label>
+                  <label className="block mb-1">ราคาป้ายเฉพาะไซส์นี้ *</label>
                   <input type="number" required value={editingProduct.price} onChange={(e) => setEditingProduct({...editingProduct, price: Number(e.target.value)})} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm font-bold text-black outline-none focus:border-indigo-500" />
                 </div>
                 <div>
