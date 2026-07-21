@@ -7,6 +7,7 @@ import Image from 'next/image';
 interface TodoItem {
   product_id: number;
   product_name: string;
+  artist_band?: string;
   selected_size: string;
   total_qty: number;
   picked_qty: number;
@@ -21,6 +22,7 @@ interface DBOrderItem {
   quantity?: number;
   products?: {
     name?: string;
+    artist_band?: string;
     price?: number;
     image_url?: string | null;
     booth_location?: string;
@@ -50,13 +52,14 @@ export default function AdminSummaryTodoListPage() {
           selected_size,
           orders!inner ( status ),
           products!inner ( 
-            name, 
+            name,
+            artist_band,
             price,
             image_url,  
             booth_location
           )
         `)
-        .in("orders.status", ["pending", "preparing"]); 
+        .in("orders.status", ["pending", "buying", "waiting_pack", "shipped", "out_of_stock", "refunded", "cancelled"]); 
 
       if (orderError) throw orderError;
 
@@ -73,6 +76,7 @@ export default function AdminSummaryTodoListPage() {
         safeOrderItems.forEach((item: DBOrderItem) => {
           const pId = Number(item.product_id);
           const prodName = item.products?.name || "สินค้าไม่ระบุชื่อ";
+          const artistBand = item.products?.artist_band || "";
           const size = item.selected_size || "N/A";
           const qty = Number(item.quantity || 0);
           const price = Number(item.products?.price || 0);
@@ -88,6 +92,7 @@ export default function AdminSummaryTodoListPage() {
             summaryMap[groupKey] = {
               product_id: pId,
               product_name: prodName,
+              artist_band: artistBand,
               selected_size: size,
               total_qty: qty,
               picked_qty: 0,
@@ -246,6 +251,21 @@ export default function AdminSummaryTodoListPage() {
                       </button>
                     </div>
 
+                    {/* รูปภาพสินค้า */}
+                    <div className="w-14 h-14 bg-gray-100 rounded-xl border border-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                      {item.image_url && item.image_url.trim() !== "" ? (
+                        <Image 
+                          src={item.image_url} 
+                          alt={item.product_name || "Product Image"}
+                          width={56}
+                          height={56}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-lg">📦</span>
+                      )}
+                    </div>                    
+
                     {/* รายละเอียดสินค้าและบูธ */}
                     <div className="flex-1 min-w-0 space-y-1">
                       <div className="flex items-center gap-2">
@@ -261,7 +281,7 @@ export default function AdminSummaryTodoListPage() {
                       </div>
 
                       <h3 className={`font-bold text-gray-900 text-xs sm:text-sm truncate ${isFullyPicked ? "line-through text-gray-400" : ""}`}>
-                        {item.product_name}
+                        {item.artist_band ? `${item.artist_band} - ` : ""}{item.product_name}
                       </h3>
 
                       {/* สถานะจำนวนค้างหยิบ */}

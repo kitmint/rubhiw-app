@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
+
 
 interface OrderItem {
   id: number;
@@ -48,7 +50,8 @@ export default function AdminTodoListPage() {
 
   const [itemEditingOrder, setItemEditingOrder] = useState<Order | null>(null);
   const [tempOrderItems, setTempOrderItems] = useState<OrderItem[]>([]);
-  
+  const [viewingReceiptOrder, setViewingReceiptOrder] = useState<Order | null>(null);
+
   const [newSelectedProdId, setNewSelectedProdId] = useState<string>("");
   const [newSelectedSize, setNewSelectedSize] = useState<string>("Free size");
   const [newQuantity, setNewQuantity] = useState<number>(1);
@@ -376,19 +379,25 @@ export default function AdminTodoListPage() {
                     </p>
                   </div>
                   
-                  {/* ปุ่มจัดการบิล: บนมือถือปรับเป็นปุ่มคู่แบบ Grid 2 คอลัมน์ ไม่ให้ดันข้อมูลตกขอบ */}
+                  {/* ปุ่มจัดการบิล: เพิ่มปุ่ม 🧾 ดูใบเสร็จ ปรับเป็น Grid 3 คอลัมน์บนมือถือ */}
                   <div className="flex flex-row items-center justify-between lg:justify-end gap-2 w-full lg:w-auto pt-2 lg:pt-0 border-t lg:border-t-0 border-gray-50">
                     <div className="flex-shrink-0">{getStatusBadge(order.status)}</div>
-                    <div className="grid grid-cols-2 gap-1.5 flex-1 lg:flex lg:flex-row lg:gap-1 max-w-[280px] lg:max-w-none ml-auto">
+                    <div className="grid grid-cols-3 gap-1 flex-1 lg:flex lg:flex-row lg:gap-1.5 max-w-[340px] lg:max-w-none ml-auto">
+                      <button
+                        onClick={() => setViewingReceiptOrder(order)}
+                        className="w-full lg:w-auto px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[10px] sm:text-xs font-bold transition border border-emerald-200/40 text-center whitespace-nowrap"
+                      >
+                        🧾 ดูใบเสร็จ
+                      </button>
                       <button
                         onClick={() => openItemEditModal(order)}
-                        className="w-full lg:w-auto px-2 sm:px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-[10px] sm:text-xs font-bold transition border border-amber-200/40 text-center whitespace-nowrap"
+                        className="w-full lg:w-auto px-2 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-[10px] sm:text-xs font-bold transition border border-amber-200/40 text-center whitespace-nowrap"
                       >
                         📦 จัดการสินค้า
                       </button>
                       <button
                         onClick={() => openEditModal(order)}
-                        className="w-full lg:w-auto px-2 sm:px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] sm:text-xs font-bold transition border border-indigo-100/40 text-center whitespace-nowrap"
+                        className="w-full lg:w-auto px-2 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] sm:text-xs font-bold transition border border-indigo-100/40 text-center whitespace-nowrap"
                       >
                         ✏️ แก้ไขบิล
                       </button>
@@ -436,6 +445,129 @@ export default function AdminTodoListPage() {
         )}
 
       </div>
+
+      {/* 🧾 MODAL สำหรับดูใบเสร็จ & ตรวจสอบสลิปโอนเงิน (เพิ่มใหม่) */}
+      {viewingReceiptOrder && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 z-50 text-black">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
+            
+            {/* หัวข้อ Modal */}
+            <div className="flex justify-between items-start border-b border-gray-100 pb-3">
+              <div>
+                <span className="text-[10px] bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded">
+                  บิล #${viewingReceiptOrder.id}
+                </span>
+                <h2 className="text-base sm:text-lg font-black text-gray-900 mt-1">
+                  🧾 สรุปออเดอร์ & หลักฐานโอนเงิน
+                </h2>
+                <p className="text-[11px] text-gray-400">
+                  สั่งเมื่อ: {new Date(viewingReceiptOrder.created_at).toLocaleString('th-TH')}
+                </p>
+              </div>
+              <button 
+                onClick={() => setViewingReceiptOrder(null)} 
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 font-bold flex items-center justify-center text-sm transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 📸 หลักฐานสลิปการโอนเงิน */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-extrabold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                💳 หลักฐานการชำระเงิน (สลิปโอนเงิน)
+              </p>
+
+              {viewingReceiptOrder.slip_url && viewingReceiptOrder.slip_url.trim() !== "" ? (
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-2 text-center space-y-2">
+                  <div className="relative w-full h-72 rounded-xl overflow-hidden bg-gray-100 border border-gray-200/60 flex items-center justify-center">
+                    <Image
+                      src={viewingReceiptOrder.slip_url}
+                      alt="สลิปการโอนเงิน"
+                      fill
+                      sizes="(max-width: 768px) 100vw, 400px"
+                      className="object-contain p-2"
+                      priority
+                    />
+                  </div>
+                  <a 
+                    href={viewingReceiptOrder.slip_url} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="inline-block text-[11px] bg-white border border-gray-200 hover:bg-gray-50 text-indigo-600 font-bold px-3 py-1.5 rounded-xl transition shadow-2xs"
+                  >
+                    🔍 กดเปิดดูรูปสลิปขนาดใหญ่
+                  </a>
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 text-center">
+                  <span className="text-xl block mb-1">⚠️</span>
+                  <p className="text-xs font-bold text-amber-900">ไม่พบรูปสลิปการโอนเงินในบิลนี้</p>
+                  <p className="text-[10px] text-amber-700 mt-0.5">ลูกค้าอาจจะยังไม่ได้อัปโหลดสลิป หรือทำรายการไม่สมบูรณ์</p>
+                </div>
+              )}
+            </div>
+
+            {/* ข้อมูลลูกค้า & สถานะ */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 font-bold">ชื่อลูกค้า:</span>
+                <span className="font-bold text-gray-900">👤 คุณ{viewingReceiptOrder.customer_name}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 font-bold">เบอร์/ช่องทางติดต่อ:</span>
+                <span className="font-mono font-bold text-gray-800">📱 {viewingReceiptOrder.contact || "➖"}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 font-bold">สถานะบิล:</span>
+                <div>{getStatusBadge(viewingReceiptOrder.status)}</div>
+              </div>
+            </div>
+
+            {/* รายการสินค้าที่สั่ง */}
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">🛍️ สินค้าในบิลนี้</p>
+              <div className="bg-gray-50 rounded-2xl p-3 divide-y divide-gray-100 space-y-2 text-xs">
+                {viewingReceiptOrder.order_items?.map((item: OrderItem) => (
+                  <div key={item.id} className="pt-2 first:pt-0 flex justify-between items-center">
+                    <div>
+                      <p className="font-bold text-gray-800">{item.products?.name || "สินค้าฝากหิ้ว"}</p>
+                      <p className="text-[10px] text-gray-400">ไซส์: {item.selected_size}</p>
+                    </div>
+                    <span className="font-bold text-gray-900">x {item.quantity} ชิ้น</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ยอดเงินรวม */}
+            <div className="border-t border-dashed border-gray-200 pt-3 space-y-1 text-xs">
+              <div className="flex justify-between text-gray-500">
+                <span>ค่าจัดส่ง:</span>
+                <span>฿{viewingReceiptOrder.shipping_fee || 0}</span>
+              </div>
+              <div className="flex justify-between text-sm font-black text-gray-900 pt-1">
+                <span>ยอดรวมสุทธิ:</span>
+                <span className="text-indigo-600 text-base">฿{Number(viewingReceiptOrder.total_price || 0).toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* ที่อยู่จัดส่ง */}
+            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 text-xs space-y-1">
+              <p className="font-bold text-gray-700">📍 ที่อยู่จัดส่ง:</p>
+              <p className="text-gray-600 text-[11px] leading-relaxed">{viewingReceiptOrder.address || "❌ ยังไม่ได้กรอกที่อยู่"}</p>
+            </div>
+
+            <button 
+              onClick={() => setViewingReceiptOrder(null)} 
+              className="w-full py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-xl text-xs transition shadow-xs mt-2"
+            >
+              ปิดหน้าต่างใบเสร็จ
+            </button>
+
+          </div>
+        </div>
+      )}
 
       {/* 🛑 MODAL ที่ 1: หน้าต่างแก้ไขข้อมูลบิลทั่วไป */}
       {editingOrderId !== null && (

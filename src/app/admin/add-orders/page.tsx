@@ -37,6 +37,20 @@ export default function AdminAddOrdersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [cartAlert, setCartAlert] = useState<string | null>(null);
+
+  const filteredProducts = products.filter((p) => {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return true;
+    
+    const nameMatch = p.name?.toLowerCase().includes(term);
+    const artistMatch = p.artist_band?.toLowerCase().includes(term);
+    const concertMatch = p.concert_name?.toLowerCase().includes(term);
+    
+    return nameMatch || artistMatch || concertMatch;
+  });
+  
   const updateSizeOptions = (productId: string, allProducts: Product[]) => {
     const prod = allProducts.find((p) => p.id.toString() === productId);
     if (prod && prod.size && prod.size.trim() !== "") {
@@ -96,16 +110,23 @@ export default function AdminAddOrdersPage() {
     } else {
       setCart([...cart, { product: prod, quantity: selectedQuantity, selectedSize: selectedSize }]);
     }
+
+    const alertMsg = `เพิ่ม "${prod.name}" (${selectedSize}) จำนวน ${selectedQuantity} ชิ้น เข้าบิลเรียบร้อยแล้วค่ะ`;
+    setCartAlert(alertMsg);
+
+    setTimeout(() => {
+      setCartAlert(null);
+    }, 2000);
+
     setSelectedQuantity(1); 
   };
 
   const decreaseFromCart = (index: number) => {
     const newCart = [...cart];
     if (newCart[index].quantity > 1) {
-      newCart[index].quantity -= 1; // ลดทีละ 1 ชิ้นตามต้องการ
+      newCart[index].quantity -= 1;
       setCart(newCart);
     } else {
-      // ถ้าเหลือชิ้นสุดท้ายแล้วกดลบ ค่อยคัดชื่อแถวนั้นทิ้งไปเลยครับ
       const filteredCart = cart.filter((_, i) => i !== index);
       setCart(filteredCart);
     }
@@ -215,7 +236,28 @@ export default function AdminAddOrdersPage() {
   if (loading) return <div className="text-center mt-10 text-gray-500 font-medium">⏳ กำลังเตรียมหน้าต่างจดออเดอร์...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-6 text-black">
+    <div className="max-w-4xl mx-auto p-4 md:p-6 text-black relative">
+    {cartAlert && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+        <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border border-gray-100 space-y-3 animate-in fade-in zoom-in duration-150">
+          <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-2xl mx-auto font-bold">
+            ✓
+          </div>
+          <h3 className="text-base font-black text-gray-900">เพิ่มสินค้าสำเร็จ!</h3>
+          <p className="text-xs font-semibold text-gray-600 leading-relaxed">
+            {cartAlert}
+          </p>
+          <button
+            type="button"
+            onClick={() => setCartAlert(null)}
+            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-sm transition active:scale-95 mt-2"
+          >
+            ตกลง
+          </button>
+        </div>
+      </div>
+    )}
+
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-950">📝 ระบบแอดมิน - จดเปิดออเดอร์รับหิ้ว</h1>
@@ -241,18 +283,36 @@ export default function AdminAddOrdersPage() {
               <p className="text-xs text-gray-400 py-4 text-center">ขณะนี้ไม่มีสินค้าที่เปิดรับหิ้วอยู่ในระบบ</p>
             ) : (
               <div className="space-y-4">
+
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">เลือกรายการสินค้า</label>
+                  <label className="block text-xs font-bold text-indigo-600 uppercase mb-1">🔍 ค้นหาชื่อสินค้า / ศิลปิน</label>
+                  <input
+                    type="text"
+                    placeholder="พิมพ์ค้นหา..."
+                    className="w-full border border-indigo-100 rounded-xl p-2.5 bg-indigo-50/40 text-sm font-medium outline-none focus:border-indigo-500 text-black placeholder-gray-400"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+                    เลือกรายการสินค้า ({filteredProducts.length} รายการ)
+                  </label>
                   <select 
                     className="w-full border border-gray-200 rounded-xl p-2.5 bg-gray-50 text-sm font-medium outline-none focus:border-indigo-500"
                     value={selectedProductId}
                     onChange={handleProductChange}
                   >
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.artist_band} / {p.name} (size: {p.size}) — ฿{Number(p.price) + Number(p.hiew_fee)}
-                      </option>
-                    ))}
+                    {filteredProducts.length === 0 ? (
+                      <option value="">❌ ไม่พบสินค้าที่ตรงคำค้นหา</option>
+                    ) : (
+                      filteredProducts.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.artist_band ? `${p.artist_band} / ` : ''}{p.name} (size: {p.size}) — ฿{Number(p.price) + Number(p.hiew_fee)}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
                 
